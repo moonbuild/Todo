@@ -1,49 +1,48 @@
-import { useEffect, useState } from "react";
+import { create } from "zustand";
 import { Todo } from "../interface/todos";
 import { dummyData } from "../data/todos";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-
-export default function useTodos(){
-    const [todos, setTodos] = useState(()=>{
-        const savedTodos: Todo[] = JSON.parse(
-            localStorage.getItem("todos") || "[]"
-        );
-        return savedTodos.length > 0 ? savedTodos : dummyData;
-    });
-    
-    useEffect(()=>{
-        localStorage.setItem("todos", JSON.stringify(todos));
-    }, [todos]);
-    
-    function setTodoCompleted(id:number, completed:boolean){
-    setTodos((prev)=>
-    prev.map((todo)=> (todo.id === id ? {...todo, completed} : todo)))
-    }
-    function addTodo(title:string){
-    setTodos((prev)=>[
-        {
-        id:Date.now(),
-        title,
-        completed:false
-        },
-        ...prev,
-    ]);
-    }
-
-    function deleteTodo(id:number){
-    setTodos((prev)=>
-        prev.filter(prev => prev.id !== id)
-    )
-    }
-    function deleteAllCompletedTodos(){
-    setTodos((prev)=>prev.filter(prev=>!prev.completed))
-    }
-
-    return {
-        todos,
-        setTodoCompleted,
-        addTodo,
-        deleteTodo,
-        deleteAllCompletedTodos,
-    };
+interface TodoStore{
+    todos:Todo[];
+    addTodo:(title:string)=>void;
+    toggleTodo:(id:number)=>void;
+    deleteTodo:(id:number)=>void;
+    deleteAllCompletedTodos:()=>void;
 }
+
+const useTodos = create<TodoStore>()(persist((set) => ({
+    todos: dummyData,
+    addTodo: (title)=> set((state)=>({
+        todos:[
+            {
+                id:Date.now(),
+                title,
+                completed:false,
+            },
+            ...state.todos,
+        ],
+    })),
+
+    toggleTodo: (id)=>set((state)=>({
+        todos: state.todos.map((todo) =>
+            todo.id === id ? {...todo, completed:!todo.completed} : todo
+        ),
+    })),
+
+    deleteTodo: (id)=>set((state)=>({
+        todos: state.todos.filter((todo)=>todo.id!=id),
+    })),
+
+    deleteAllCompletedTodos: ()=>set((state)=>({
+        todos: state.todos.filter((todo)=>!todo.completed)
+    })),
+}),
+{
+    name:'todos-storage',
+    storage:createJSONStorage(()=>localStorage),
+}
+));
+
+
+export default useTodos;
